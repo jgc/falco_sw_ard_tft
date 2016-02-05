@@ -1,0 +1,934 @@
+//#include <ESP8266_TCP.h>
+//  Hardware SPI Pins: Arduino Uno		sclk=13, data=11
+//Ucglib_ST7735_18x128x160_SWSPI ucg(/*sclk=*/ 13, /*data=*/ 11, /*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
+//Ucglib_ST7735_18x128x160_HWSPI ucg(/*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
+
+//#define DEBUG  // Uncomment for serial print debug  (cannot have TESTDATA and DEBUG)
+//#define TESTDATA  // Uncomment for test data (cannot have TESTDATA and DEBUG)
+
+#include <SPI.h>
+#include <Wire.h>
+#include "Ucglib.h"
+
+#define messageSU1 "Falco Manager TFT"  // UP TO 18 characters
+#define messageSU2 "Remote Monitor"
+#define messageSU3 "version 0.5.0"
+#define messageW1  "Waiting for data"
+#define messageW2  "Data received"
+
+#define gridName "Menu"
+#define gridMenuItems "0Item 1|1Item 2|1Item 3"
+// Ucglib_ST7735_18x128x160_SWSPI ucg(8, 9, 10 , 12, 11); // This works
+Ucglib_ST7735_18x128x160_HWSPI ucg(9 , 10, 8);
+#define THIS_ADDRESS 0x04
+
+uint16_t tRed = 350; // 0 -> 65535
+int8_t tBlue = 10; // -128 -> 127
+
+uint8_t i0;
+uint8_t i1;
+uint8_t i2;
+String v0;
+String v1;
+String v2;
+String v3;
+
+uint16_t  stata[9];
+int16_t  tempa[9];
+int16_t  tmina[9];
+int16_t  tmaxa[9];
+boolean   tflag1[9];
+uint16_t  batta[9];
+uint16_t  humia[9];
+uint16_t  weiga[9];
+uint16_t  msena[9];
+int8_t nodeCount = 0;
+boolean refreshDisplay = 0;
+//boolean loopFlag = 1;
+int nodeStart = 0;
+boolean waiting = 1;
+uint8_t tflag = 0;
+boolean motionStatus = 0;
+
+String nn0 = "Node 1";
+String nn1 = "Node 2";
+String nn2 = "Node 3";
+String nn3 = "Node 4";
+String nn4 = "Node 5";
+String nn5 = "Node 6";
+String nn6 = "Node 7";
+String nn7 = "Node 8";
+String nn8 = "Node 9";
+
+
+
+// *** SETUP *** 
+// *** SETUP *** 
+// *** SETUP *** 
+void setup(void)
+{
+  Serial.begin(57600);
+  //#ifdef DEBUG
+  Serial.println(F("Starting setup ..."));
+  //#endif
+  delay(1000);
+  ucg.begin(UCG_FONT_MODE_TRANSPARENT);
+  //ucg.begin(UCG_FONT_MODE_SOLID);
+
+  Wire.begin(0x04);       // join i2c bus with address #4
+  Wire.onReceive(receiveEvent); // register event
+
+  ucg.clearScreen();
+  ucg.setRotate90();
+
+  for (int i = 0; i < 9; i++) {
+    stata[i] = 0;
+    tempa[i] = 32767;
+    tmina[i] = 32767;
+    tmaxa[i] = 32767;
+    tflag1[i] = 0;
+    batta[i] = 32767;
+    humia[i] = 32767;
+    weiga[i] = 32767;
+    msena[i] = 32767;
+  }
+  displayText(1, 0, 20, messageSU1);
+  displayText(1, 0, 40, messageSU2);
+  displayText(1, 0, 80, messageSU3);
+  delay(1000);
+  ucg.clearScreen();
+  delay(100);
+}
+
+
+
+// *** LOOP *** 
+// *** LOOP *** 
+// *** LOOP *** 
+void loop(void)
+{
+  //ucg.clearScreen();
+  //ucg.setRotate90();
+
+#ifdef TESTDATA
+  for (int i = 0; i < 9; i++) {
+    uint8_t s0 = random(0, 2);
+#ifdef DEBUG
+    Serial.print(F("stata = "));
+    Serial.println(String(stata[i]));
+#endif
+    int d0 = random(-50, 550);
+    int b0 = random(15, 33);
+    int h0 = random(0, 1000);
+    int w0 = random(0, 5000);
+    uint8_t m0 = random(0, 2);
+    stata[i] = s0;
+    tempa[i] = d0 + 0;
+    tmina[i] = d0 - 50;
+    tmaxa[i] = d0 + 50;
+    batta[i] = b0;
+    humia[i] = h0;
+    weiga[i] = w0;
+    msena[i] = m0;
+
+    String nodeNString;
+    nodeNString = "Node: " + String(i);
+#ifdef DEBUG
+    Serial.println(nodeNString);
+#endif
+    switch (i) {
+      case 0:
+        nn0 = nodeNString;
+        break;
+      case 1:
+        nn1 = nodeNString;
+        break;
+      case 2:
+        nn2 = nodeNString;
+        break;
+      case 3:
+        nn3 = nodeNString;
+        break;
+      case 4:
+        nn4 = nodeNString;
+        break;
+      case 5:
+        nn5 = nodeNString;
+        break;
+      case 6:
+        nn6 = nodeNString;
+        break;
+      case 7:
+        nn7 = nodeNString;
+        break;
+      case 8:
+        nn8 = nodeNString;
+        break;
+    }
+  }
+#endif
+
+#ifdef DEBUG
+  Serial.print("nn0 = ");
+  Serial.println(String(nn0));
+  Serial.print("nn1 = ");
+  Serial.println(String(nn1));
+  Serial.print("nn2 = ");
+  Serial.println(String(nn2));
+  Serial.print("nn3 = ");
+  Serial.println(String(nn3));
+  Serial.print("nn4 = ");
+  Serial.println(String(nn4));
+  Serial.print("nn5 = ");
+  Serial.println(String(nn5));
+  Serial.print("nn6 = ");
+  Serial.println(String(nn6));
+  Serial.print("nn7 = ");
+  Serial.println(String(nn7));
+  Serial.print("nn8 = ");
+  Serial.println(String(nn8));
+#endif
+
+#ifdef TESTDATA
+  ucg.clearScreen();
+  displayGrid(1, 0, 0, 3, 0, gridName, gridMenuItems);
+  delay(1000);
+
+  ucg.clearScreen();
+  displayGrid(1, 0, 0, 4, 3, "Test Grid", "");
+  delay(1000);
+
+  displayLoop(1, 0, 1000);
+  delay(1000);
+
+  ucg.clearScreen();
+  displayTriangle(0, 0, 0);
+  displayHumidity(0, 0, 0, humia[2]);
+  displayWeight(0, 0, 0, weiga[2]);
+  delay(2000);
+#endif
+  /*
+  if (waiting == 1) {
+    //ucg.clearScreen();
+    displayText(0, 0, 0, messageW1);
+  }
+  */
+
+  if (nodeStart == 10) nodeStart = 0;
+  if (nodeStart == 0 && nodeCount > 1) {
+    displayDGrid(21, 1250);
+    displayDGrid(22, 750);
+    displayDGrid(23, 750);
+    displayDGrid(11, 750);
+    ucg.setFontPosBaseline();
+  }
+  displayLoop(0, nodeStart, 1250);
+  nodeStart++;
+
+
+  //delay(1000);
+  // ** END LOOP **
+  // ** END LOOP **
+  // ** END LOOP **
+}
+
+
+
+
+
+
+
+
+
+
+
+// ****** Battery function ******
+// ****** Battery function ******
+// ****** Battery function ******
+void displayBattery(int layout, int value, int flag, int batx, int baty) {
+  if (layout == 0) {
+    batx = 110;
+    baty = 95;
+  }
+  int btextos = 4;
+  int bath = 12 + (2 * btextos);
+  int batwf = 20;
+  int batw = bath * batwf / 10;
+  int batph = bath / 5;
+
+  if (flag == 1) ucg.setColor(255, 0, 0); else ucg.setColor(0, 255, 0);
+  ucg.drawRBox(batx, baty, batw, bath, 1);
+  ucg.drawRBox(batx + batw, baty + batph, 4, bath - (2 * batph), 1);
+  ucg.setColor(0, 0, 0);
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font
+
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font???
+  ucg.setColor(0, 0, 0);
+  ucg.setPrintPos(batx + btextos, baty + bath - btextos);  // FIX RIGHT ALIGN
+  ucg.print(intToStr1Dec(value));
+  ucg.print(" v");
+}
+
+
+// ****** Display Grid ******
+// ****** Display Grid ******
+// ****** Display Grid ******
+void displayGrid(int layout, int x, int y, int r, int c, String gName, String mItems) {
+  if (layout == 0) {
+    x = 0;
+    y = 0;
+    r = 3;
+    c = 3;
+  }
+
+  splitStr(mItems);
+  int r0 = v0.substring(0, 1).toInt();
+  int r1 = v1.substring(0, 1).toInt();
+  int r2 = v2.substring(0, 1).toInt();
+#ifdef DEBUG
+  Serial.print("mItemValue r0: ");
+  Serial.println(r0);
+  Serial.print("mItemValue r1: ");
+  Serial.println(r1);
+  Serial.print("mItemValue r2: ");
+  Serial.println(r2);
+#endif
+
+  int gw = ucg.getWidth();
+  int gh = ucg.getHeight();
+
+#ifdef DEBUG
+  Serial.print("Width / Height: ");
+  Serial.print(gw);
+  Serial.print(" / ");
+  Serial.println(gh);
+#endif
+
+  ucg.setColor(0, 255, 0);
+  ucg.drawBox(1, 1, gw, 20);
+  ucg.setColor(0, 0, 0);
+  ucg.setPrintPos(3, 17);
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font
+  ucg.print(gName);
+  ucg.setColor(0, 255, 0);
+  ucg.drawVLine(1, 16, gh - 15);
+  ucg.drawVLine(gw - 1, 16, gh - 15);
+  int cx = (gw / c);
+#ifdef DEBUG
+  Serial.print("cx = ");
+  Serial.println(cx);
+#endif
+  int cx2 = 0;
+  for (int ic = 0; ic < c; ic++) {
+    cx2 = cx2 + cx;
+#ifdef DEBUG
+    Serial.print("Col ");
+    Serial.print(ic);
+    Serial.print("; x = ");
+    Serial.println(cx2 + 1);
+#endif
+    ucg.drawVLine(cx2 + 1, 21, gh - 20);
+  }
+  int ry = ((gh - 20) / r);
+  ucg.drawHLine(1, gh - 1, gw);
+  for (int ir = 0; ir < r; ir++) {
+    int ry2 = ry2 + ry;
+#ifdef DEBUG
+    Serial.print("Row ");
+    Serial.print(ir);
+    Serial.print("; y = ");
+    Serial.println(ry2 + 20);
+#endif
+    ucg.drawHLine(1, ry2 + 20, gw);
+
+    ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font???
+    ucg.setColor(0, 255, 0);
+    ucg.setPrintPos(5, ry2 + 20 - 12);
+    switch (ir) {
+      case 0:
+        if (r0 == 1) ucg.setColor(255, 0, 0); else ucg.setColor(0, 255, 0);
+        ucg.print(v0.substring(1));
+        break;
+      case 1:
+        if (r1 == 1) ucg.setColor(255, 0, 0); else ucg.setColor(0, 255, 0);
+        ucg.print(v1.substring(1));
+        break;
+      case 2:
+        if (r2 == 1) ucg.setColor(255, 0, 0); else ucg.setColor(0, 255, 0);
+        ucg.print(v2.substring(1));
+        break;
+    }
+  }
+}
+
+
+
+// ****** Display DGrid ******
+// ****** Display DGrid ******
+// ****** Display DGrid ******
+void displayDGrid(int layout, int delaySeconds) {
+  ucg.clearScreen();
+  String gName = "";
+  int gw = ucg.getWidth();
+  int gh = ucg.getHeight();
+  int x = 0;
+  int y = 0;
+  int r = 3;
+  int c = 3;
+  char dS = 'C';
+
+  if (layout == 11) gName = "Battery (volts)";
+  if (layout == 21) gName = "Temperature (" + String(char(176)) + String(dS) + ")";
+  if (layout == 22) gName = "Minimum (" + String(char(176)) + String(dS) + ")";
+  if (layout == 23) gName = "Maximum (" + String(char(176)) + String(dS) + ")";
+
+  ucg.setColor(0, 255, 0);
+  ucg.drawBox(1, 1, gw, 20);
+  ucg.setColor(0, 0, 0);
+  ucg.setFontPosCenter();
+  ucg.setPrintPos(3, 10 + 1);
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font
+  ucg.print(gName);
+
+  ucg.setColor(0, 255, 0);
+  ucg.drawVLine(1, 16, gh - 15);
+  ucg.drawVLine(gw - 1, 16, gh - 15);
+  int cx = (gw / c);
+  int cx2 = 0;
+  for (int ic = 0; ic < c; ic++) {
+    cx2 = cx2 + cx;
+    ucg.drawVLine(cx2 + 1, 21, gh - 20);
+  }
+  int ry = ((gh - 20) / r);
+  ucg.drawHLine(1, gh - 1, gw);
+  for (int ir = 0; ir < r; ir++) {
+    int ry2 = ry2 + ry;
+    ucg.drawHLine(1, ry2 + 20, gw);
+    ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font???
+    ucg.setColor(0, 255, 0);
+    ucg.setPrintPos(5, ry2 + 20 - 12);
+  }
+
+  uint8_t nanode = 0;
+  int dData = 32767;
+  for (int c = 0; c < 3; c++) {
+    for (int r = 1; r < 4; r++) {
+      if (layout == 11) dData = batta[nanode];
+      if (layout == 21) dData = tempa[nanode];
+      if (layout == 22) dData = tmina[nanode];
+      if (layout == 23) dData = tmaxa[nanode];
+      if (dData != 32767) {
+        char cData[5];
+        intToStr1Dec(dData).toCharArray(cData, 5);
+        ucg.setFont(ucg_font_ncenR12_tf);
+        int texty = 20 + (((gh - 20) / 3) * r) - (((gh - 20) / 3) / 2);
+        int textx =  0 + ((gw / 3) * c) + 5;
+        ucg.setColor(0, 255, 0);
+        if (layout == 21 && tflag1[nanode] == 1) ucg.setColor(255, 0, 0);
+        ucg.setPrintPos(textx, texty);
+        ucg.print(cData);
+      }
+      nanode++;
+    }
+  }
+  delay(delaySeconds);
+}
+
+
+
+// ****** Humidity sensor ******
+// ****** Humidity sensor ******
+// ****** Humidity sensor ******
+void displayHumidity(int layout, int x, int y, int value, int flag) {
+  if (layout == 0) {
+    x = 30;
+    y = 80;
+  }
+  ucg.setColor(96, 96, 96);
+  ucg.drawDisc(x, y + 7, 18, UCG_DRAW_ALL);
+  ucg.drawDisc(x - 15, y + 10, 10, UCG_DRAW_ALL);
+  ucg.drawDisc(x + 15, y + 10, 10, UCG_DRAW_ALL);
+  ucg.drawDisc(x, y + 15, 10, UCG_DRAW_ALL);
+}
+
+
+// ****** Motion sensor ******
+// ****** Motion sensor ******
+// ****** Motion sensor ******
+void displayMotionSensor(int layout, int x, int y, int value) {
+  if (layout == 0) {
+    x = 110;
+    y = 80;
+  }
+
+  if (value == 0) ucg.setColor(0, 255, 0); else ucg.setColor(255, 0, 0);
+  ucg.drawRBox(x - 2, y - 20, 50, 24, 3);
+  ucg.setColor(0, 0, 0);
+  ucg.drawCircle(x + 0, y + 0, 3, UCG_DRAW_UPPER_RIGHT);
+  ucg.drawCircle(x + 0, y + 0, 4, UCG_DRAW_UPPER_RIGHT);
+  ucg.drawCircle(x + 0, y + 0, 9, UCG_DRAW_UPPER_RIGHT);
+  ucg.drawCircle(x + 0, y + 0, 10, UCG_DRAW_UPPER_RIGHT);
+  ucg.drawCircle(x + 0, y + 0, 14, UCG_DRAW_UPPER_RIGHT);
+  ucg.drawCircle(x + 0, y + 0, 15, UCG_DRAW_UPPER_RIGHT);
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font???
+  ucg.setColor(0, 0, 0);
+  ucg.setPrintPos(x + 20, y - 1);
+  if (value == 0) {
+    ucg.print("OK");
+  } else {
+    ucg.print("ON");
+  }
+}
+
+
+// ****** Node ******
+// ****** Node ******
+// ****** Node ******
+void displayNode(int layout, int nodeNum, int flag, int nx, int ny) {
+  ucg.setColor(0, 255, 0);
+  int nodx = 80; //was 110
+  int nody = 2;
+  int nodiframes = 2;
+  int nodtextos = 5;
+  int nodh = 12 + (2 * (nodiframes + nodtextos));
+  int nodwf = 35; //was 15
+  int nodw = nodh * nodwf / 10;
+  int nodph = nodh / 5;
+  ucg.drawRBox(nodx, nody, nodw, nodh, 1);
+  ucg.drawRBox(nodx + nodw - 2, nody + nodh - 6, 8, 4, 1);
+  ucg.drawRBox(nodx + nodw + 4, nody + 2, 4, nodh - 4, 1);
+
+  ucg.setColor(0, 0, 0);
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font
+  int node = nodeNum - 1;
+  String snode =  String(node);
+  String space =  String(" ");
+  ucg.setPrintPos(nodx + nodiframes + nodtextos + 5, nody + nodh - nodtextos - nodiframes);
+#ifdef DEBUG
+  Serial.print("[snode / sizeof / length][");
+  Serial.print(snode);
+  Serial.print("]: ");
+  Serial.print(sizeof(snode));
+  Serial.print(" / ");
+  Serial.println(snode.length());
+#endif
+  //ucg.print(" "); // does not work
+  switch (node) {
+    case 0:
+      snode = nn0;
+      break;
+    case 1:
+      snode = nn1;
+      break;
+    case 2:
+      snode = nn2;
+      break;
+    case 3:
+      snode = nn3;
+      break;
+    case 4:
+      snode = nn4;
+      break;
+    case 5:
+      snode = nn5;
+      break;
+    case 6:
+      snode = nn6;
+      break;
+    case 7:
+      snode = nn7;
+      break;
+    case 8:
+      snode = nn8;
+      break;
+    default:
+      snode = "Node " + String(nodeNum);
+      break;
+  }
+#ifdef DEBUG
+  Serial.println(snode);
+#endif
+  ucg.print(snode);
+  //delay(2000);
+}
+
+
+
+// ****** Display Text ******
+// ****** Display Text ******
+// ****** Display Text ******
+void displayText(int layout, int x, int y, String sValue) {
+  if (layout == 0) {
+    x = 5;
+    y = 50;
+  }
+  ucg.setColor(0, 255, 0);
+  ucg.setFont(ucg_font_ncenR12_tf);
+  ucg.setPrintPos(x, y);
+  ucg.print(sValue);
+}
+
+
+
+// ****** Thermometer ******
+// ****** Thermometer ******
+// ****** Thermometer ******
+void displayThermometer(int layout, int tval, int tmin, int tmax, int flag, int tx, int ty) {
+  int x = tx;
+  int y = ty;
+  if (layout == 0) {
+    x = 6;
+    y = 10;
+  }
+  ucg.setColor(0, 255, 0); //red box
+  ucg.drawRBox(1, 1, 66, 128 - 2, 3);
+  ucg.setColor(255, 0, 0); //green box
+  ucg.drawRBox(x + 15, y - 1, 37, 21, 3);
+  ucg.setColor(0, 128, 255); //blue box
+  ucg.drawRBox(x + 15, y + 69, 37, 21, 3);
+
+  int tempM = map(tval, -100, 600, 0, 110);
+
+  ucg.setColor(0, 0, 0); // black thermometer
+  ucg.drawDisc(x + 5, 115, 8, UCG_DRAW_ALL);
+  ucg.drawRBox(x - 1, y, 12, 110, 3); // radius must be < half width
+
+  ucg.setColor(0, 255, 0); //red
+  if (flag == 20) ucg.setColor(255, 0, 0);//green
+  if (flag == 10) ucg.setColor(0, 128, 255);//blue
+  Serial.print("flag = ");
+  Serial.println(flag);
+  ucg.drawRBox(x + 3, 110 - tempM, 4, tempM + 2, 1); // radius must be < half width
+  ucg.drawDisc(x + 5, 115, 4, UCG_DRAW_ALL);
+  ucg.drawRBox(x + 15, y + 33, 37, 21, 3);
+
+  ucg.setColor(255, 255, 255);
+  ucg.drawHLine(x, y + 100 - map(0,  -10, 60, 0, 110), 3);
+  ucg.drawHLine(x, y + 100 - map(10, -10, 60, 0, 110), 3);
+  ucg.drawHLine(x, y + 100 - map(20, -10, 60, 0, 110), 3);
+  ucg.drawHLine(x, y + 100 - map(30, -10, 60, 0, 110), 3);
+  ucg.drawHLine(x, y + 100 - map(40, -10, 60, 0, 110), 3);
+  ucg.drawHLine(x, y + 100 - map(50, -10, 60, 0, 110), 3);
+  //String degC = String(char(176)) + "C";  //176 / 0xb0
+
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font???
+  ucg.setColor(0, 0, 0);
+  char sTemp[5];
+  intToStr1Dec(tval).toCharArray(sTemp, 5);
+  Serial.println(tval);
+  Serial.println(sTemp);
+  ucg.setPrintPos(x + 15 + 37 - 3 - ucg.getStrWidth(sTemp), y + 50);
+  ucg.print(sTemp);
+
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font???
+  ucg.setColor(0, 0, 0);
+  intToStr1Dec(tmax).toCharArray(sTemp, 5);
+  ucg.setPrintPos(x + 15 + 37 - 3 - ucg.getStrWidth(sTemp), y + 15);
+  ucg.print(sTemp);
+
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font???
+  ucg.setColor(0, 0, 0);
+  intToStr1Dec(tmin).toCharArray(sTemp, 5);
+  ucg.setPrintPos(x + 15 + 37 - 3 - ucg.getStrWidth(sTemp), y + 85);
+  ucg.print(sTemp);
+
+  ucg.setFont(ucg_font_ncenR12_tf); // w17:h17 full font???
+  ucg.setColor(0, 0, 0);
+  ucg.setPrintPos(x + 18, y + 112);
+  //ucg.print(degC);
+  ucg.print(char(176));
+  ucg.print("C");
+}
+
+
+
+// ****** Triangle function ******
+// ****** Triangle function ******
+// ****** Triangle function ******
+void displayTriangle(int layout, int x, int y) {
+  // Warning Triangle
+  ucg.setColor(255, 0, 0);
+  int tx = 120;
+  int ty = 120;
+  int th = 40;
+  int tw = 51;
+  int tff = 6;
+  int tx1 = 110;
+  int ty1 = 50;
+  for (int col = 0; col < th ; col++) {
+    ucg.setColor(255, 0, 0);
+    ucg.drawPixel(tx1 - (col / 2) - 0, ty1 + col);
+    ucg.drawPixel(tx1 - (col / 2) - 1, ty1 + col);
+    ucg.drawPixel(tx1 - (col / 2) - 2, ty1 + col);
+    ucg.drawPixel(tx1 - (col / 2) - 3, ty1 + col);
+    ucg.drawPixel(tx1 + (col / 2) + 0, ty1 + col);
+    ucg.drawPixel(tx1 + (col / 2) + 1, ty1 + col);
+    ucg.drawPixel(tx1 + (col / 2) + 2, ty1 + col);
+    ucg.drawPixel(tx1 + (col / 2) + 3, ty1 + col);
+    if (col > 6) {
+      ucg.setColor(255, 255, 255);
+      ucg.drawLine(tx1 - (col / 2) + 3, ty1 + col,  tx1 + (col / 2) - 3, ty1 + col);
+    }
+    if (col > th - 2) {
+      ucg.setColor(0, 0, 0);
+      ucg.drawLine(tx1 - (col / 2) + 3, ty1 + col,  tx1 + (col / 2) - 3, ty1 + col);
+    }
+  }
+  ucg.setColor(255, 0, 0);
+  ucg.drawLine(tx1 - th / 2, ty1 + th + 0, tx1 + th / 2, ty1 + th + 0);
+  ucg.drawLine(tx1 - th / 2, ty1 + th + 1, tx1 + th / 2, ty1 + th + 1);
+  ucg.drawLine(tx1 - th / 2, ty1 + th + 2, tx1 + th / 2, ty1 + th + 2);
+  /*
+  ucg.drawTriangle(tx,ty,  tx+th,ty,  tx+(th/2),ty-th);
+  ucg.setColor(255, 255, 255);
+  ucg.drawTriangle(tx+8,ty-4,  tx+th-8,ty-4,  tx+(th/2),ty-th+14);
+  */
+  ucg.setColor(0, 0, 0);
+  ucg.drawRBox(tx1 - 2, ty1 + 13, 4, 15, 1);
+  ucg.drawDisc(tx1, ty1 + th - 7, 2, UCG_DRAW_ALL);
+}
+
+
+
+// ****** Display Weight ******
+// ****** Display Weight ******
+// ****** Display Weight ******
+void displayWeight(int layout, int x, int y, int value ) {
+  if (layout == 0) {
+    x = 5;
+    y = 5;
+  }
+  int sw = 40;
+  int sh = 50;
+  int sr = 10;
+  ucg.setColor(96, 96, 96);
+  ucg.drawRBox(x, y, sw, sh, 3);
+  ucg.setColor(255, 255, 255);
+  ucg.drawDisc(x + sw / 2, y + sh / 3, sr, UCG_DRAW_UPPER_LEFT);
+  ucg.drawDisc(x + sw / 2, y + sh / 3, sr, UCG_DRAW_UPPER_RIGHT);
+  ucg.setColor(0, 0, 0);
+  ucg.drawTriangle(x + sw / 2 - 2, y + sh / 3 - 2,  x + sw / 2 + 2, y + sh / 3 - 2,  x + sh / 3 + sr - 2, y + sh / 3 + 2);
+}
+
+
+// ****** receiveEvent ******
+// ****** receiveEvent ******
+// ****** receiveEvent ******
+void receiveEvent(int howMany) {
+  //waiting = 0;
+  //loopFlag = 0;
+
+#ifdef DEBUG
+  Serial.print("\n");
+#endif
+  String dataString = "";
+  //digitalWrite(LED, HIGH);
+  while (0 < Wire.available()) // loop through all (use 1 for all but last)
+  {
+    char c = Wire.read(); // receive byte as a character
+    //Serial.print(c);         // print the character
+    dataString = dataString + c;
+  }
+  //int x = Wire.read();    // receive byte as an integer
+#ifdef DEBUG
+  Serial.print(" [");
+  Serial.print(dataString);
+  Serial.println("] ");
+#endif
+
+  int c1 = dataString.indexOf('|');
+  int c2 = dataString.indexOf('|', c1 + 1);
+  int c3 = dataString.indexOf('|', c2 + 1);
+  int c4 = dataString.indexOf('|', c3 + 1);
+  int c5 = dataString.indexOf('|', c4 + 1);
+  int c6 = dataString.indexOf('|', c5 + 1);
+  String v1 = dataString.substring(0     , c1);
+  String v2 = dataString.substring(c1 + 1, c2); //node
+  String v3 = dataString.substring(c2 + 1, c3); //volts
+  String v4 = dataString.substring(c3 + 1, c4); //temp
+  String v5 = dataString.substring(c4 + 1, c5); //tMin
+  String v6 = dataString.substring(c5 + 1, c6); //tMax
+  String v7 = dataString.substring(c6 + 1);     //tFlag
+
+//#ifdef DEBUG
+  Serial.print("[");
+  Serial.print(v1);
+  Serial.print(" - ");
+  Serial.print(v2);
+  Serial.print(" - ");
+  Serial.print(v3);
+  Serial.print(" - ");
+  Serial.print(v4);
+  Serial.println("]");
+  //Serial.println(" [received on slave]");
+//#endif
+
+  if (v1 == "te") {
+    int rt = v2.toInt();
+    resetMaxMin(rt);
+    Serial.print("resetMaxMin: ");
+    Serial.println(rt);
+  }
+  
+  if (v1 == "rt") {
+    int rt = v2.toInt();
+    resetMaxMin(rt);
+    Serial.print("resetMaxMin: ");
+    Serial.println(rt);
+  }
+  
+  if (v1 == "dt") {
+    //ucg.clearScreen();
+    refreshDisplay = 1;
+    Serial.println("Save data");
+    int tn = v2.toInt();
+    int nan = tn - 1;
+    int tv = v3.toInt();
+    int temp = v4.toInt();
+    int tmin = v5.toInt();
+    int tmax = v6.toInt();
+    int tflag = v7.toInt();
+    int nflag = 1;
+
+    if (stata[nan] == 0){
+      stata[nan] = 1;
+      nodeCount++;
+    }
+    tempa[nan] = temp;
+    tmina[nan] = tmin;
+    tmaxa[nan] = tmax;
+    batta[nan] = tv;
+    humia[nan] = 100;
+    weiga[nan] = 100;
+    msena[nan] = tflag;
+    nodeStart = nan;
+
+#ifdef DEBUG
+    Serial.print("\nNode = ");
+    Serial.print(tn);
+    Serial.print(" Nan = ");
+    Serial.print(nan);
+    Serial.print(" temp = ");
+    Serial.print(temp);
+    String txS = intToStr1Dec(temp);
+    Serial.print(" txS = ");
+    Serial.println(txS);
+    //displayText(0, 0, 0, txS);
+#endif
+
+    //displayLoop(0, nan, 1000); DOES NOT WORK SMOOTHLY
+    /*
+    displayNode(0, tn, nflag, 0, 0);
+    uint8_t bflag;
+    if (tv < 32) bflag = 1; else bflag = 0;
+    displayBattery(0, tv, bflag, 0, 0);
+    displayThermometer(0, temp, tmin, tmax, tflag, 0, 0);
+    */
+  }
+}
+
+
+
+// ****** intToStr1Dec ******
+// ****** intToStr1Dec ******
+// ****** intToStr1Dec ******
+String intToStr1Dec(int value) {
+  //Serial.print("Value = ");
+  //Serial.println(value);
+  int v10 = value % 10;
+  //Serial.print("v10 = ");
+  //Serial.println(v10);
+  if (v10 < 0) v10 = 0 - v10; // FIX not needed??
+  //int v = value / 10;
+  // add negative as necessary
+  String sS = "";
+  if (value < 0 && value > -10) sS = "-"; 
+  String sV = sS + String(value / 10) + "." + String(v10);
+  //Serial.print("sV = ");
+  //Serial.println(sV);
+  return sV;
+}
+
+// ****** split values ******
+// ****** split values ******
+// ****** split values ******
+void splitStr(String sValue) {
+  i0 = sValue.indexOf('|');
+  i1 = sValue.indexOf('|', i0 + 1);
+  i2 = sValue.indexOf('|', i1 + 1);
+  v0 = sValue.substring(0, i0);
+  v1 = sValue.substring(i0 + 1, i1);
+  v2 = sValue.substring(i1 + 1, i2); //To the end of the string
+  v3 = sValue.substring(i2 + 1); //To the end of the string
+
+#ifdef DEBUG
+  Serial.print(" [");
+  Serial.print(v0);
+  Serial.print("]|[");
+  Serial.print(v1);
+  Serial.print("]|[");
+  Serial.print(v2);
+  Serial.print("]|[");
+  Serial.print(v3);
+  Serial.println("]");
+#endif
+}
+
+
+// ****** Loop display ******
+// ****** Loop display ******
+// ****** Loop display ******
+void displayLoop(int layout, int nan, int delaySeconds) {
+  //ucg.clearScreen();
+
+  //Serial.print("dl:");
+  //Serial.println(nan);
+
+  //loopFlag = 1;
+  //while (loopFlag == 1){
+  //if (nan == 10) nan = 0;
+  if (stata[nan] == 1 && refreshDisplay == 1) {
+    if (nodeCount == 1)
+      refreshDisplay = 0;
+#ifdef DEBUG
+    Serial.print("Il:");
+    Serial.println(nan);
+#endif
+    ucg.clearScreen();
+    int node = nan + 1;
+    displayNode(0, node, 0, 0, 0);
+    int tflag = 0;
+    int bflag = 0;
+    //Serial.print("tempa[nan]=");
+    //Serial.println(tempa[nan]);
+    if (tempa[nan] > tRed) tflag = 20;
+    if (tempa[nan] < tBlue) tflag = 10;
+    displayThermometer(0, tempa[nan], tmina[nan], tmaxa[nan], tflag, 0, 0);
+    //TEST for -ve 
+    //displayThermometer(0, -10, 9, tmaxa[nan], tflag, 0, 0);
+    
+    displayBattery(0, batta[nan], bflag, 0, 0);
+    //displayMotionSensor(0, 0, 0, msena[nan]);
+    nan++;
+    delay(delaySeconds);
+  }
+  //}
+}
+
+// ****** reset max/min ******
+// ****** reset max/min ******
+// ****** reset max/min ******
+void resetMaxMin(int value) {
+  Serial.print("Reset max / min:");
+  Serial.println(value);
+  if (value == 999) {
+    for (int i = 0; i < 10; i++) {
+      tmina[i] = tempa[i];
+      tmaxa[i] = tempa[i];
+    }
+  }
+  if ((value >= 0) && (value <= 9)) {
+    tmina[value] = tempa[value];
+    tmaxa[value] = tempa[value];
+  }
+}
