@@ -668,13 +668,13 @@ void displayThermometer(int layout, int tval, int tmin, int tmax, int flag, int 
 void displayTriangle(int layout, int x, int y) {
   // Warning Triangle
   ucg.setColor(255, 0, 0);
-  int tx = 120;
-  int ty = 120;
+  int tx = 140; // 120
+  int ty = 110; // 120
   int th = 40;
   int tw = 51;
   int tff = 6;
-  int tx1 = 110;
-  int ty1 = 50;
+  int tx1 = tx - 10;
+  int ty1 = ty - 70;
   for (int col = 0; col < th ; col++) {
     ucg.setColor(255, 0, 0);
     ucg.drawPixel(tx1 - (col / 2) - 0, ty1 + col);
@@ -785,7 +785,7 @@ void receiveEvent(int howMany) {
 
   // " md | node |0|0|0|0|0 "
   if (v1 == "md") {
-    textToDisplay = 1;
+    //textToDisplay = 1;
     Serial.println("Missing data");
     int tn = v2.toInt();
     int nan = tn - 1;
