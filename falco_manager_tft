@@ -3,8 +3,9 @@
 //Ucglib_ST7735_18x128x160_SWSPI ucg(/*sclk=*/ 13, /*data=*/ 11, /*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
 //Ucglib_ST7735_18x128x160_HWSPI ucg(/*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
 
-//#define DEBUG  // Uncomment for serial print debug  (cannot have TESTDATA and DEBUG)
-//#define TESTDATA  // Uncomment for test data (cannot have TESTDATA and DEBUG)
+//#define DEBUG  // Uncomment for serial print debug 
+//#define DEBUG_MIN  // Uncomment for serial print debug_min
+//#define TESTDATA  // Uncomment for test data 
 
 #include <SPI.h>
 #include <Wire.h>
@@ -12,7 +13,7 @@
 
 #define messageSU1 "Falco Manager TFT"  // UP TO 18 characters
 #define messageSU2 "Remote Monitor"
-#define messageSU3 "version 0.5.2"
+#define messageSU3 "version 0.5.3"
 #define messageW1  "Waiting for data"
 #define messageW2  "Data received"
 
@@ -74,9 +75,9 @@ String nn8 = "Node 9";
 void setup(void)
 {
   Serial.begin(57600);
-  //#ifdef DEBUG
+  #ifdef DEBUG
   Serial.println(F("Starting setup ..."));
-  //#endif
+  #endif
   delay(1000);
   ucg.begin(UCG_FONT_MODE_TRANSPARENT);
   //ucg.begin(UCG_FONT_MODE_SOLID);
@@ -616,8 +617,10 @@ void displayThermometer(int layout, int tval, int tmin, int tmax, int flag, int 
   ucg.setColor(0, 255, 0); //red
   if (flag == 20) ucg.setColor(255, 0, 0);//green
   if (flag == 10) ucg.setColor(0, 128, 255);//blue
+  #ifdef DEBUG
   Serial.print("flag = ");
   Serial.println(flag);
+  #endif
   ucg.drawRBox(x + 3, 110 - tempM, 4, tempM + 2, 1); // radius must be < half width
   ucg.drawDisc(x + 5, 115, 4, UCG_DRAW_ALL);
   ucg.drawRBox(x + 15, y + 33, 37, 21, 3);
@@ -635,8 +638,10 @@ void displayThermometer(int layout, int tval, int tmin, int tmax, int flag, int 
   ucg.setColor(0, 0, 0);
   char sTemp[5];
   intToStr1Dec(tval).toCharArray(sTemp, 5);
+  #ifdef DEBUG
   Serial.println(tval);
   Serial.println(sTemp);
+  #endif
   ucg.setPrintPos(x + 15 + 37 - 3 - ucg.getStrWidth(sTemp), y + 50);
   ucg.print(sTemp);
 
@@ -786,7 +791,9 @@ void receiveEvent(int howMany) {
   // " md | node |0|0|0|0|0 "
   if (v1 == "md") {
     //textToDisplay = 1;
+    #ifdef DEBUG
     Serial.println("Missing data");
+    #endif
     int tn = v2.toInt();
     int nan = tn - 1;
     md[nan] = 1;
@@ -798,8 +805,10 @@ void receiveEvent(int howMany) {
     string1y = v4.toInt();
     string1 = v5;
     string1f = v6.toInt();
+    #ifdef DEBUG
     Serial.print("Text = ");
     Serial.println(string1);  
+    #endif
   }
   
   if (v1 == "rt") {
@@ -810,14 +819,18 @@ void receiveEvent(int howMany) {
     string1y = v4.toInt();
     string1 = "Max/Min reset";
     string1f = v6.toInt();
+    #ifdef DEBUG
     Serial.print("resetMaxMin: ");
     Serial.println(rt);
+    #endif
   }
   
   if (v1 == "dt") {
     //ucg.clearScreen();
     refreshDisplay = 1;
+    #ifdef DEBUG
     Serial.println("Save data");
+    #endif
     int tn = v2.toInt();
     int nan = tn - 1;
     int tv = v3.toInt();
@@ -962,8 +975,10 @@ void displayLoop(int layout, int nan, int delaySeconds) {
 // ****** reset max/min ******
 // ****** reset max/min ******
 void resetMaxMin(int value) {
+  #ifdef DEBUG
   Serial.print("Reset max / min:");
   Serial.println(value);
+  #endif
   if (value == 999) {
     for (int i = 0; i < 10; i++) {
       tmina[i] = tempa[i];
