@@ -3,6 +3,7 @@
 //Ucglib_ST7735_18x128x160_SWSPI ucg(/*sclk=*/ 13, /*data=*/ 11, /*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
 //Ucglib_ST7735_18x128x160_HWSPI ucg(/*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
 
+  #define DEBUG_NONE
 //#define DEBUG  // Uncomment for serial print debug 
 //#define DEBUG_MIN  // Uncomment for serial print debug_min
 //#define TESTDATA  // Uncomment for test data 
@@ -75,6 +76,18 @@ String nn8 = "Node 9";
 void setup(void)
 {
   Serial.begin(57600);
+  #ifdef DEBUG_NONE
+  Serial.println("No debug setting");
+  #endif
+  #ifdef DEBUG
+  Serial.println("Debug setting = DEBUG");
+  #endif
+  #ifdef DEBUG_MIN
+  Serial.println("Debug setting = DEBUG_MIN");
+  #endif
+  #ifdef TESTDATA
+  Serial.println("Debug setting = TESTDATA");
+  #endif
   #ifdef DEBUG
   Serial.println(F("Starting setup ..."));
   #endif
@@ -775,7 +788,7 @@ void receiveEvent(int howMany) {
   String v6 = dataString.substring(c5 + 1, c6); //tMax
   String v7 = dataString.substring(c6 + 1);     //tFlag
 
-//#ifdef DEBUG
+#ifdef DEBUG
   Serial.print("[");
   Serial.print(v1);
   Serial.print(" - ");
@@ -785,8 +798,7 @@ void receiveEvent(int howMany) {
   Serial.print(" - ");
   Serial.print(v4);
   Serial.println("]");
-  //Serial.println(" [received on slave]");
-//#endif
+#endif
 
   // " md | node |0|0|0|0|0 "
   if (v1 == "md") {
