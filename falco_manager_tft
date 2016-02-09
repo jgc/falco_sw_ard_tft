@@ -114,12 +114,13 @@ void setup(void)
     msena[i] = 32767;
     md[i] = 0;
   }
+  
   displayText(1, 0, 20, messageSU1);
   displayText(1, 0, 40, messageSU2);
   displayText(1, 0, 80, messageSU3);
-  delay(1000);
+  //delay(1000);
   ucg.clearScreen();
-  delay(100);
+  //delay(100);
 }
 
 
@@ -232,7 +233,11 @@ void loop(void)
  
   if (textToDisplay == 1)
   {
-    ucg.clearScreen();
+    if (refreshDisplay == 1)
+    {
+      ucg.clearScreen();
+      refreshDisplay = 0;
+    }
     //displayText(int layout, int x, int y, String sValue)
     displayText(0, string1x, string1y, string1);
     if (string1d == 1)
@@ -811,7 +816,7 @@ void receiveEvent(int howMany) {
   }
   
   if (v1 == "te") { 
-    ucg.clearScreen();
+    refreshDisplay = 1;
     textToDisplay = 1;
     //string1x = v2.toInt(); // v2 = node (future)
     string1x = v3.toInt(); // x
@@ -844,7 +849,6 @@ void receiveEvent(int howMany) {
   }
   
   if (v1 == "dt") {
-    //ucg.clearScreen();
     refreshDisplay = 1;
     #ifdef DEBUG
     Serial.println("Save data");
