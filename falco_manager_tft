@@ -1,9 +1,9 @@
-//#include <ESP8266_TCP.h>
-//  Hardware SPI Pins: Arduino Uno		sclk=13, data=11
-//Ucglib_ST7735_18x128x160_SWSPI ucg(/*sclk=*/ 13, /*data=*/ 11, /*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
-//Ucglib_ST7735_18x128x160_HWSPI ucg(/*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
+// #include <ESP8266_TCP.h>
+// Hardware SPI Pins: Arduino Uno  sclk=13, data=11
+// Ucglib_ST7735_18x128x160_SWSPI ucg(/*sclk=*/ 13, /*data=*/ 11, /*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
+// Ucglib_ST7735_18x128x160_HWSPI ucg(/*cd=*/ 9 , /*cs=*/ 10, /*reset=*/ 8);
 
-  #define DEBUG_NONE
+#define DEBUG_NONE
 //#define DEBUG  // Uncomment for serial print debug 
 //#define DEBUG_MIN  // Uncomment for serial print debug_min
 //#define TESTDATA  // Uncomment for test data 
@@ -14,7 +14,7 @@
 
 #define messageSU1 "Falco Manager TFT"  // UP TO 18 characters
 #define messageSU2 "Remote Monitor"
-#define messageSU3 "version 0.5.3"
+#define messageSU3 "version 0.5.4"
 #define messageW1  "Waiting for data"
 #define messageW2  "Data received"
 
@@ -52,11 +52,12 @@ int nodeStart = 0;
 boolean waiting = 1;
 uint8_t tflag = 0;
 boolean motionStatus = 0;
-boolean textToDisplay = 0;
+boolean textToDisplay = 0; 
 String string1 = "";
 uint8_t string1x = 0;
 uint8_t string1y = 0;
 uint8_t string1f = 0;
+int16_t string1d = 0;
 
 String nn0 = "Node 1";
 String nn1 = "Node 2";
@@ -134,10 +135,10 @@ void loop(void)
 #ifdef TESTDATA
   for (int i = 0; i < 9; i++) {
     uint8_t s0 = random(0, 2);
-#ifdef DEBUG
+   #ifdef DEBUG
     Serial.print(F("stata = "));
     Serial.println(String(stata[i]));
-#endif
+    #endif
     int d0 = random(-50, 550);
     int b0 = random(15, 33);
     int h0 = random(0, 1000);
@@ -154,9 +155,9 @@ void loop(void)
 
     String nodeNString;
     nodeNString = "Node: " + String(i);
-#ifdef DEBUG
+    #ifdef DEBUG
     Serial.println(nodeNString);
-#endif
+    #endif
     switch (i) {
       case 0:
         nn0 = nodeNString;
@@ -228,24 +229,22 @@ void loop(void)
   displayWeight(0, 0, 0, weiga[2]);
   delay(2000);
 #endif
-  /*
-  if (waiting == 1) {
-    //ucg.clearScreen();
-    displayText(0, 0, 0, messageW1);
-  }
-  */
+ 
   if (textToDisplay == 1)
   {
-    //displayText(int layout, int x, int y, String sValue)
     ucg.clearScreen();
-    textToDisplay = 0;
+    //displayText(int layout, int x, int y, String sValue)
     displayText(0, string1x, string1y, string1);
-    delay(500);
+    if (string1d == 1)
+      textToDisplay = 1; // do not block non text
+    else
+    {
+      textToDisplay = 0; // block non text
+      string1d = 0;
+    }
   }
 
-  if (nodeStart == 10) nodeStart = 0;
-  
-  if (nodeStart == 0 && nodeCount > 1) {
+  if (nodeStart == 0 && nodeCount > 1 && textToDisplay == 0) {
     displayDGrid(21, 1250);
     displayDGrid(22, 750);
     displayDGrid(23, 750);
@@ -254,14 +253,14 @@ void loop(void)
   }
 
   displayLoop(0, nodeStart, 1250);
-  nodeStart++;
+  
+  if (nodeCount > 1) nodeStart++;
+  if (nodeStart == 10) nodeStart = 0;
 
-
-  //delay(1000);
-  // ** END LOOP **
-  // ** END LOOP **
-  // ** END LOOP **
 }
+// ** END LOOP **
+// ** END LOOP **
+// ** END LOOP **
 
 
 
@@ -596,6 +595,7 @@ void displayText(int layout, int x, int y, String sValue) {
     x = 5;
     y = 50;
   }
+  //ucg.clearScreen();
   ucg.setColor(0, 255, 0);
   ucg.setFont(ucg_font_ncenR12_tf);
   ucg.setPrintPos(x, y);
@@ -802,7 +802,6 @@ void receiveEvent(int howMany) {
 
   // " md | node |0|0|0|0|0 "
   if (v1 == "md") {
-    //textToDisplay = 1;
     #ifdef DEBUG
     Serial.println("Missing data");
     #endif
@@ -811,26 +810,33 @@ void receiveEvent(int howMany) {
     md[nan] = 1;
   }
   
-  if (v1 == "te") {
+  if (v1 == "te") { 
+    ucg.clearScreen();
     textToDisplay = 1;
-    string1x = v3.toInt();
-    string1y = v4.toInt();
-    string1 = v5;
-    string1f = v6.toInt();
+    //string1x = v2.toInt(); // v2 = node (future)
+    string1x = v3.toInt(); // x
+    string1y = v4.toInt(); // y
+    string1  = v5;         // text
+    string1f = v6.toInt(); // format (0 = default)
+    string1d = v7.toInt(); // delay mode: 0 = no blocking, 1 = blocking
     #ifdef DEBUG
     Serial.print("Text = ");
     Serial.println(string1);  
+    Serial.print("Delay mode = ");
+    Serial.println(string1d);  
     #endif
   }
   
   if (v1 == "rt") {
+    refreshDisplay = 1; //ensures that display reverts after reset text
     int rt = v2.toInt();
     resetMaxMin(rt);
     textToDisplay = 1;
-    string1x = v3.toInt();
-    string1y = v4.toInt();
+    string1x = v3.toInt(); // x
+    string1y = v4.toInt(); // y
     string1 = "Max/Min reset";
-    string1f = v6.toInt();
+    string1f = v6.toInt(); // format
+    string1d = 0; // delay mode
     #ifdef DEBUG
     Serial.print("resetMaxMin: ");
     Serial.println(rt);
@@ -996,7 +1002,7 @@ void resetMaxMin(int value) {
       tmina[i] = tempa[i];
       tmaxa[i] = tempa[i];
     }
-    nodeStart = 0;
+    //nodeStart = 0;
   }
   if ((value >= 0) && (value <= 9)) {
     tmina[value] = tempa[value];
