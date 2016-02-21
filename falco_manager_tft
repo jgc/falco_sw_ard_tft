@@ -14,7 +14,7 @@
 
 #define messageSU1 "Falco Manager TFT"  // UP TO 18 characters
 #define messageSU2 "Remote Monitor"
-#define messageSU3 "version 0.5.4"
+#define messageSU3 "version 0.5.5"
 #define messageW1  "Waiting for data"
 #define messageW2  "Data received"
 
@@ -833,7 +833,7 @@ void receiveEvent(int howMany) {
   }
   
   if (v1 == "rt") {
-    refreshDisplay = 1; //ensures that display reverts after reset text
+    refreshDisplay = 0; //ensures that display reverts after reset text
     int rt = v2.toInt();
     resetMaxMin(rt);
     textToDisplay = 1;
