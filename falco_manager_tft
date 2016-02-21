@@ -14,7 +14,7 @@
 
 #define messageSU1 "Falco Manager TFT"  // UP TO 18 characters
 #define messageSU2 "Remote Monitor"
-#define messageSU3 "version 0.5.5"
+#define messageSU3 "version 0.5.6"
 #define messageW1  "Waiting for data"
 #define messageW2  "Data received"
 
