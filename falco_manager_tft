@@ -49,11 +49,14 @@ int8_t nodeCount = 0;
 boolean refreshDisplay = 0;
 //boolean loopFlag = 1;
 int nodeStart = 0;
+int nodeStartReset = 1;
 boolean waiting = 1;
 uint8_t tflag = 0;
 boolean motionStatus = 0;
 boolean textToDisplay = 0; 
+boolean resetTemp = 0;
 String string1 = "";
+String string2 = "";
 uint8_t string1x = 0;
 uint8_t string1y = 0;
 uint8_t string1f = 0;
@@ -115,9 +118,9 @@ void setup(void)
     md[i] = 0;
   }
   
-  displayText(1, 0, 20, messageSU1);
-  displayText(1, 0, 40, messageSU2);
-  displayText(1, 0, 80, messageSU3);
+  displayText(1, 0, 20, messageSU1, 0, 255, 0, 0);
+  displayText(1, 0, 40, messageSU2, 0, 255, 0, 0);
+  displayText(1, 0, 80, messageSU3, 0, 255, 0, 0);
   //delay(1000);
   ucg.clearScreen();
   //delay(100);
@@ -238,8 +241,9 @@ void loop(void)
       ucg.clearScreen();
       refreshDisplay = 0;
     }
-    //displayText(int layout, int x, int y, String sValue)
-    displayText(0, string1x, string1y, string1);
+    //displayText(int layout, int x, int y, String sValue, 0, 255, 0, 0)
+    displayText(0, string1x, string1y, string1, 0, 255, 0, 0);
+ 
     if (string1d == 1)
       textToDisplay = 1; // do not block non text
     else
@@ -249,7 +253,7 @@ void loop(void)
     }
   }
 
-  if (nodeStart == 0 && nodeCount > 1 && textToDisplay == 0) {
+  if (nodeStart == 0 && nodeCount > 1 && textToDisplay == 0 && resetTemp == 0) {
     displayDGrid(21, 1250);
     displayDGrid(22, 750);
     displayDGrid(23, 750);
@@ -257,7 +261,15 @@ void loop(void)
     ucg.setFontPosBaseline();
   }
 
-  displayLoop(0, nodeStart, 1250);
+  if (resetTemp == 1){
+    //delay(2); 
+    displayLoop(0, nodeStartReset, 1250); // FIX for specific node
+    resetTemp = 0;
+    nodeStart = nodeStartReset;
+  } else 
+  { 
+    displayLoop(0, nodeStart, 1250); 
+  }
   
   if (nodeCount > 1) nodeStart++;
   if (nodeStart == 10) nodeStart = 0;
@@ -309,6 +321,9 @@ void displayBattery(int layout, int value, int flag, int batx, int baty) {
 // ****** Display Grid ******
 // ****** Display Grid ******
 void displayGrid(int layout, int x, int y, int r, int c, String gName, String mItems) {
+  if (nodeStart == 0 && nodeCount > 1 && textToDisplay == 0)
+  {
+  
   if (layout == 0) {
     x = 0;
     y = 0;
@@ -394,6 +409,7 @@ void displayGrid(int layout, int x, int y, int r, int c, String gName, String mI
         break;
     }
   }
+  }
 }
 
 
@@ -402,6 +418,7 @@ void displayGrid(int layout, int x, int y, int r, int c, String gName, String mI
 // ****** Display DGrid ******
 // ****** Display DGrid ******
 void displayDGrid(int layout, int delaySeconds) {
+  if (nodeStart == 0 && nodeCount > 1 && textToDisplay == 0 && resetTemp == 0) {
   ucg.clearScreen();
   String gName = "";
   int gw = ucg.getWidth();
@@ -412,7 +429,7 @@ void displayDGrid(int layout, int delaySeconds) {
   int c = 3;
   char dS = 'C';
 
-  if (textToDisplay == 1) return;
+  //if (textToDisplay == 1) return;
     
   if (layout == 11) gName = "Battery (volts)";
   if (layout == 21) gName = "Temperature (" + String(char(176)) + String(dS) + ")";
@@ -469,6 +486,7 @@ void displayDGrid(int layout, int delaySeconds) {
     }
   }
   delay(delaySeconds);
+}
 }
 
 
@@ -595,13 +613,14 @@ void displayNode(int layout, int nodeNum, int flag, int nx, int ny) {
 // ****** Display Text ******
 // ****** Display Text ******
 // ****** Display Text ******
-void displayText(int layout, int x, int y, String sValue) {
+void displayText(int layout, int x, int y, String sValue, uint8_t cRed, uint8_t cGreen, uint8_t cBlue, uint8_t fSize) {
+
   if (layout == 0) {
     x = 5;
     y = 50;
   }
-  //ucg.clearScreen();
-  ucg.setColor(0, 255, 0);
+  
+  ucg.setColor(cRed, cGreen, cBlue);
   ucg.setFont(ucg_font_ncenR12_tf);
   ucg.setPrintPos(x, y);
   ucg.print(sValue);
@@ -833,15 +852,15 @@ void receiveEvent(int howMany) {
   }
   
   if (v1 == "rt") {
-    refreshDisplay = 0; //ensures that display reverts after reset text
+    //refreshDisplay = 1; //ensures that display reverts after reset text
+    //textToDisplay = 1;
     int rt = v2.toInt();
+    //string1x = v3.toInt(); // x
+    //string1y = v4.toInt(); // y
+    string2 = "Max/Min reset";
+    //string1f = v6.toInt(); // format
+    //string1d = 0; // delay mode
     resetMaxMin(rt);
-    textToDisplay = 1;
-    string1x = v3.toInt(); // x
-    string1y = v4.toInt(); // y
-    string1 = "Max/Min reset";
-    string1f = v6.toInt(); // format
-    string1d = 0; // delay mode
     #ifdef DEBUG
     Serial.print("resetMaxMin: ");
     Serial.println(rt);
@@ -886,7 +905,7 @@ void receiveEvent(int howMany) {
     String txS = intToStr1Dec(temp);
     Serial.print(" txS = ");
     Serial.println(txS);
-    //displayText(0, 0, 0, txS);
+  //displayText(0, 0, 0, txS, 0, 255, 0, 0);
 #endif
 
     //displayLoop(0, nan, 1000); DOES NOT WORK SMOOTHLY
@@ -961,11 +980,12 @@ void displayLoop(int layout, int nan, int delaySeconds) {
   //while (loopFlag == 1){
   //if (nan == 10) nan = 0;
   
-  if (textToDisplay == 1) return;
+  if ((textToDisplay == 1) && (string1d == 1)) return;
   
   if (stata[nan] == 1 && refreshDisplay == 1) {
     if (nodeCount == 1)
       refreshDisplay = 0;
+      
 #ifdef DEBUG
     Serial.print("Il:");
     Serial.println(nan);
@@ -986,7 +1006,15 @@ void displayLoop(int layout, int nan, int delaySeconds) {
     displayBattery(0, batta[nan], bflag, 0, 0);
     //displayMotionSensor(0, 0, 0, msena[nan]);
     
-    if (md[nan] == 1) displayTriangle(0,0,0);
+    //if (md[nan] == 1) displayTriangle(0,0,0);
+    // ADD ucg.getStrWidth() aso text can be correctly positioned
+    if (md[nan] == 1) // display warning text - faster than triangle
+    {
+      displayText(1, 82, 48, "NO", 255, 0, 0, 0);
+      displayText(1, 82, 68, "NEW", 255, 0, 0, 0);
+      displayText(1, 82, 88, "DATA", 255, 0, 0, 0);
+    }
+    
     nan++;
     delay(delaySeconds);
   }
@@ -997,20 +1025,39 @@ void displayLoop(int layout, int nan, int delaySeconds) {
 // ****** reset max/min ******
 // ****** reset max/min ******
 void resetMaxMin(int value) {
-  #ifdef DEBUG
-  Serial.print("Reset max / min:");
-  Serial.println(value);
-  #endif
+  //#ifdef DEBUG
+  //Serial.print("Reset max / min = ");
+  //Serial.println(value);
+  //#endif
+
+  nodeStartReset = 1;
+    
   if (value == 999) {
     for (int i = 0; i < 10; i++) {
       tmina[i] = tempa[i];
       tmaxa[i] = tempa[i];
     }
-    //nodeStart = 0;
   }
+  
   if ((value >= 0) && (value <= 9)) {
     tmina[value] = tempa[value];
     tmaxa[value] = tempa[value];
-    nodeStart = value - 1;
+    nodeStartReset = value + 1;
   }
+  
+  resetTemp = 1;
+  ucg.clearScreen();
+  //delay(2);
+  //refreshDisplay = 1; //ensures that display reverts after reset text
+  //textToDisplay = 1;
+  displayText(0, 0, 0, string2, 0, 255, 0, 0);
+  //delay(1);
+  //delay(100);
+  //ucg.clearScreen();
+  refreshDisplay = 1;
+  //textToDisplay = 0;
+  //string1d = 0;
+  //Serial.print("nodeStart = ");
+  //Serial.println(nodeStart);
+  
 }
