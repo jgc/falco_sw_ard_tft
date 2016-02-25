@@ -6,26 +6,25 @@
 #define DEBUG_NONE
 //#define DEBUG  // Uncomment for serial print debug 
 //#define DEBUG_MIN  // Uncomment for serial print debug_min
-//#define TESTDATA  // Uncomment for test data 
 
 #include <SPI.h>
 #include <Wire.h>
 #include "Ucglib.h"
 
-#define messageSU1 "Falco Manager TFT"  // UP TO 18 characters
-#define messageSU2 "Remote Monitor"
-#define messageSU3 "version 0.5.6"
-#define messageW1  "Waiting for data"
-#define messageW2  "Data received"
+#define messageSU1 "TFT Display"  // UP TO 18 characters
+#define messageSU2 "Hardware: v0.5.0"
+#define messageSU3 "Driver:   v0.5.7"
+//#define messageW1  "Waiting for data"
+//#define messageW2  "Data received"
 
-#define gridName "Menu"
-#define gridMenuItems "0Item 1|1Item 2|1Item 3"
+//#define gridName "Menu"
+//#define gridMenuItems "0Item 1|1Item 2|1Item 3"
 // Ucglib_ST7735_18x128x160_SWSPI ucg(8, 9, 10 , 12, 11); // This works
 Ucglib_ST7735_18x128x160_HWSPI ucg(9 , 10, 8);
 #define THIS_ADDRESS 0x04
 
-uint16_t tRed = 350; // 0 -> 65535
-int8_t tBlue = 10; // -128 -> 127
+uint16_t tRed = 350; // 0 -> 65535 set red  if temp above 35 degC
+int8_t tBlue = 10; // -128 -> 127  set blue if temp below 10 degC
 
 uint8_t i0;
 uint8_t i1;
@@ -35,16 +34,28 @@ String v1;
 String v2;
 String v3;
 
-uint16_t  stata[9];
-int16_t  tempa[9];
-int16_t  tmina[9];
-int16_t  tmaxa[9];
-boolean   tflag1[9];
-uint16_t  batta[9];
-uint16_t  humia[9];
-uint16_t  weiga[9];
-uint16_t  msena[9];
-uint16_t  md[9];
+uint8_t const numNodes = 20;
+uint16_t  stata[numNodes];
+int16_t  tempa[numNodes];
+int16_t  tmina[numNodes];
+int16_t  tmaxa[numNodes];
+boolean   tflag1[numNodes];
+uint16_t  batta[numNodes];
+uint16_t  humia[numNodes];
+uint16_t  weiga[numNodes];
+uint16_t  msena[numNodes];
+boolean  md[numNodes];
+char n1[numNodes];
+char n2[numNodes];
+char n3[numNodes];
+char n4[numNodes];
+char n5[numNodes];
+char n6[numNodes];
+char n7[numNodes];
+char n8[numNodes];
+
+String dataString = "                    ";
+
 int8_t nodeCount = 0;
 boolean refreshDisplay = 0;
 //boolean loopFlag = 1;
@@ -62,17 +73,6 @@ uint8_t string1y = 0;
 uint8_t string1f = 0;
 int16_t string1d = 0;
 
-String nn0 = "Node 1";
-String nn1 = "Node 2";
-String nn2 = "Node 3";
-String nn3 = "Node 4";
-String nn4 = "Node 5";
-String nn5 = "Node 6";
-String nn6 = "Node 7";
-String nn7 = "Node 8";
-String nn8 = "Node 9";
-
-
 
 // *** SETUP *** 
 // *** SETUP *** 
@@ -89,16 +89,13 @@ void setup(void)
   #ifdef DEBUG_MIN
   Serial.println("Debug setting = DEBUG_MIN");
   #endif
-  #ifdef TESTDATA
-  Serial.println("Debug setting = TESTDATA");
-  #endif
   #ifdef DEBUG
   Serial.println(F("Starting setup ..."));
   #endif
-  delay(1000);
+
   ucg.begin(UCG_FONT_MODE_TRANSPARENT);
   //ucg.begin(UCG_FONT_MODE_SOLID);
-
+  
   Wire.begin(0x04);       // join i2c bus with address #4
   Wire.onReceive(receiveEvent); // register event
 
@@ -116,14 +113,30 @@ void setup(void)
     weiga[i] = 32767;
     msena[i] = 32767;
     md[i] = 0;
+    n1[i] = 'N';
+    n2[i] = 'o';
+    n3[i] = 'd';
+    n4[i] = 'e';
+    n5[i] = ' ';
+    n6[i] = i;    
+    n7[i] = ' ';
+    n8[i] = ' ';  
   }
   
+  #ifdef DEBUG_ON
+  for (int i; i < 9; i++)
+  {
+     Serial.print("nodenames = ");
+     Serial.println(n6[i], DEC);
+  }
+  #endif
+
   displayText(1, 0, 20, messageSU1, 0, 255, 0, 0);
-  displayText(1, 0, 40, messageSU2, 0, 255, 0, 0);
+  displayText(1, 0, 60, messageSU2, 0, 255, 0, 0);
   displayText(1, 0, 80, messageSU3, 0, 255, 0, 0);
-  //delay(1000);
+  delay(2500);
   ucg.clearScreen();
-  //delay(100);
+
 }
 
 
@@ -133,113 +146,13 @@ void setup(void)
 // *** LOOP *** 
 void loop(void)
 {
-  //ucg.clearScreen();
-  //ucg.setRotate90();
-
-#ifdef TESTDATA
-  for (int i = 0; i < 9; i++) {
-    uint8_t s0 = random(0, 2);
-   #ifdef DEBUG
-    Serial.print(F("stata = "));
-    Serial.println(String(stata[i]));
-    #endif
-    int d0 = random(-50, 550);
-    int b0 = random(15, 33);
-    int h0 = random(0, 1000);
-    int w0 = random(0, 5000);
-    uint8_t m0 = random(0, 2);
-    stata[i] = s0;
-    tempa[i] = d0 + 0;
-    tmina[i] = d0 - 50;
-    tmaxa[i] = d0 + 50;
-    batta[i] = b0;
-    humia[i] = h0;
-    weiga[i] = w0;
-    msena[i] = m0;
-
-    String nodeNString;
-    nodeNString = "Node: " + String(i);
-    #ifdef DEBUG
-    Serial.println(nodeNString);
-    #endif
-    switch (i) {
-      case 0:
-        nn0 = nodeNString;
-        break;
-      case 1:
-        nn1 = nodeNString;
-        break;
-      case 2:
-        nn2 = nodeNString;
-        break;
-      case 3:
-        nn3 = nodeNString;
-        break;
-      case 4:
-        nn4 = nodeNString;
-        break;
-      case 5:
-        nn5 = nodeNString;
-        break;
-      case 6:
-        nn6 = nodeNString;
-        break;
-      case 7:
-        nn7 = nodeNString;
-        break;
-      case 8:
-        nn8 = nodeNString;
-        break;
-    }
-  }
-#endif
-
-#ifdef DEBUG
-  Serial.print("nn0 = ");
-  Serial.println(String(nn0));
-  Serial.print("nn1 = ");
-  Serial.println(String(nn1));
-  Serial.print("nn2 = ");
-  Serial.println(String(nn2));
-  Serial.print("nn3 = ");
-  Serial.println(String(nn3));
-  Serial.print("nn4 = ");
-  Serial.println(String(nn4));
-  Serial.print("nn5 = ");
-  Serial.println(String(nn5));
-  Serial.print("nn6 = ");
-  Serial.println(String(nn6));
-  Serial.print("nn7 = ");
-  Serial.println(String(nn7));
-  Serial.print("nn8 = ");
-  Serial.println(String(nn8));
-#endif
-
-#ifdef TESTDATA
-  ucg.clearScreen();
-  displayGrid(1, 0, 0, 3, 0, gridName, gridMenuItems);
-  delay(1000);
-
-  ucg.clearScreen();
-  displayGrid(1, 0, 0, 4, 3, "Test Grid", "");
-  delay(1000);
-
-  displayLoop(1, 0, 1000);
-  delay(1000);
-
-  ucg.clearScreen();
-  displayTriangle(0, 0, 0);
-  displayHumidity(0, 0, 0, humia[2]);
-  displayWeight(0, 0, 0, weiga[2]);
-  delay(2000);
-#endif
  
   if (textToDisplay == 1)
   {
     if (refreshDisplay == 1)
     {
       ucg.clearScreen();
-      refreshDisplay = 0;
+      //refreshDisplay = 0;
     }
     //displayText(int layout, int x, int y, String sValue, 0, 255, 0, 0)
     displayText(0, string1x, string1y, string1, 0, 255, 0, 0);
@@ -249,15 +162,19 @@ void loop(void)
     else
     {
       textToDisplay = 0; // block non text
-      string1d = 0;
+      //string1d = 0; // assumes cleared by new text message
     }
   }
 
   if (nodeStart == 0 && nodeCount > 1 && textToDisplay == 0 && resetTemp == 0) {
-    displayDGrid(21, 1250);
-    displayDGrid(22, 750);
-    displayDGrid(23, 750);
-    displayDGrid(11, 750);
+    displayDGrid(21, 0);
+    if (textToDisplay == 0) delay(1250);
+    displayDGrid(22, 0);
+    if (textToDisplay == 0) delay(750);
+    displayDGrid(23, 0);
+    if (textToDisplay == 0) delay(750);
+    displayDGrid(11, 0);
+    if (textToDisplay == 0) delay(750);
     ucg.setFontPosBaseline();
   }
 
@@ -265,7 +182,7 @@ void loop(void)
     //delay(2); 
     displayLoop(0, nodeStartReset, 1250); // FIX for specific node
     resetTemp = 0;
-    nodeStart = nodeStartReset;
+    nodeStart = nodeStart;
   } else 
   { 
     displayLoop(0, nodeStart, 1250); 
@@ -485,7 +402,7 @@ void displayDGrid(int layout, int delaySeconds) {
       nanode++;
     }
   }
-  delay(delaySeconds);
+  //delay(delaySeconds);
 }
 }
 
@@ -560,47 +477,17 @@ void displayNode(int layout, int nodeNum, int flag, int nx, int ny) {
   String snode =  String(node);
   String space =  String(" ");
   ucg.setPrintPos(nodx + nodiframes + nodtextos + 5, nody + nodh - nodtextos - nodiframes);
-#ifdef DEBUG
+  #ifdef DEBUG
   Serial.print("[snode / sizeof / length][");
   Serial.print(snode);
   Serial.print("]: ");
   Serial.print(sizeof(snode));
   Serial.print(" / ");
   Serial.println(snode.length());
-#endif
-  //ucg.print(" "); // does not work
-  switch (node) {
-    case 0:
-      snode = nn0;
-      break;
-    case 1:
-      snode = nn1;
-      break;
-    case 2:
-      snode = nn2;
-      break;
-    case 3:
-      snode = nn3;
-      break;
-    case 4:
-      snode = nn4;
-      break;
-    case 5:
-      snode = nn5;
-      break;
-    case 6:
-      snode = nn6;
-      break;
-    case 7:
-      snode = nn7;
-      break;
-    case 8:
-      snode = nn8;
-      break;
-    default:
-      snode = "Node " + String(nodeNum);
-      break;
-  }
+  #endif
+
+  snode = "Node " + String(n6[nodeNum], DEC);
+  
 #ifdef DEBUG
   Serial.println(snode);
 #endif
@@ -777,27 +664,49 @@ void displayWeight(int layout, int x, int y, int value ) {
 // ****** receiveEvent ******
 // ****** receiveEvent ******
 void receiveEvent(int howMany) {
-  //waiting = 0;
-  //loopFlag = 0;
-
-#ifdef DEBUG
-  Serial.print("\n");
-#endif
-  String dataString = "";
-  //digitalWrite(LED, HIGH);
-  while (0 < Wire.available()) // loop through all (use 1 for all but last)
+  dataString = "";
+  while (Wire.available() > 0)
   {
-    char c = Wire.read(); // receive byte as a character
-    //Serial.print(c);         // print the character
+    char c = Wire.read();
     dataString = dataString + c;
   }
-  //int x = Wire.read();    // receive byte as an integer
-#ifdef DEBUG
-  Serial.print(" [");
-  Serial.print(dataString);
-  Serial.println("] ");
-#endif
 
+  //#ifdef DEBUG
+  if ((dataString.length() != 18) && (dataString.length() != 21))
+  {
+    Serial.print("\n [");
+    Serial.print(dataString);
+    Serial.print("] [");
+    Serial.print(dataString.length());
+    Serial.println("] **** ERROR ****");
+  } 
+  else 
+  {
+    Serial.print(".");
+  }
+  //#endif
+  
+  int inum = 0;
+  int istart = 0;
+  int iend = 0;
+  while (iend != -1)
+  {
+    iend = dataString.indexOf('|', istart);
+    #ifdef DEBUG
+    Serial.print("istart = ");
+    Serial.print(istart); 
+    Serial.print(" iend = ");
+    Serial.print(iend); 
+    Serial.print("\t[");
+    Serial.print(dataString.substring(istart, iend));
+    Serial.print("] \t[");
+    Serial.print(inum);
+    Serial.println("]");
+    #endif
+    istart = iend + 1;
+    inum++;
+  }
+  
   int c1 = dataString.indexOf('|');
   int c2 = dataString.indexOf('|', c1 + 1);
   int c3 = dataString.indexOf('|', c2 + 1);
@@ -812,6 +721,8 @@ void receiveEvent(int howMany) {
   String v6 = dataString.substring(c5 + 1, c6); //tMax
   String v7 = dataString.substring(c6 + 1);     //tFlag
 
+  dataString = "";
+  
 #ifdef DEBUG
   Serial.print("[");
   Serial.print(v1);
